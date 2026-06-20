@@ -1,0 +1,38 @@
+[package]
+name = "downstat"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+description = "Downloads and latest version for your published packages across crates.io, PyPI, npm and GitHub releases, in one view. Agent-friendly: JSON when piped."
+authors = ["Ruben Jongejan <ruben.jongejan@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/rvben/downstat"
+homepage = "https://github.com/rvben/downstat"
+keywords = ["downloads", "crates", "pypi", "npm", "registry"]
+categories = ["command-line-utilities"]
+readme = "README.md"
+
+[lib]
+name = "downstat"
+path = "src/lib.rs"
+
+[[bin]]
+name = "downstat"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.6.1", features = ["derive"] }
+clap_complete = "4.6.5"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+thiserror = "2.0.18"
+toml = "1.1.2"
+
+[dev-dependencies]
+jsonschema = { version = "0.46.5", default-features = false }
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
