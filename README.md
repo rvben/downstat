@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/rvben/downstat/actions/workflows/ci.yml/badge.svg)](https://github.com/rvben/downstat/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/downstat.svg)](https://crates.io/crates/downstat)
-[![clispec](https://img.shields.io/badge/clispec-v0.2-blue)](https://clispec.dev)
+[![clispec compliant](https://img.shields.io/badge/clispec-compliant-3b82f6)](https://clispec.dev)
 
 Downloads and latest version for your published packages across crates.io,
 PyPI, npm and GitHub releases - in one view, instead of curling five APIs by
