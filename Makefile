@@ -19,7 +19,7 @@ fmt:
 check: lint test
 
 # Score the binary against The CLI Spec (clispec.dev). Requires `clispec`
-# (cargo install clispec). The schema's conformance to clispec v0.2 is also
+# (cargo install clispec). The schema's conformance to clispec v0.3 is also
 # verified hermetically by `make test`.
 conformance: release
 	clispec score ./target/release/downstat

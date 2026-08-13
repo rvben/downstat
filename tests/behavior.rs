@@ -26,6 +26,16 @@ impl Http for FakeHttp {
     }
 }
 
+struct UnavailableHttp;
+
+impl Http for UnavailableHttp {
+    fn get(&self, url: &str) -> Result<Option<String>, DownstatError> {
+        Err(DownstatError::Http {
+            message: format!("{url} is unavailable"),
+        })
+    }
+}
+
 fn req(name: &str, only: Option<Vec<Registry>>) -> Request {
     Request {
         names: vec![name.to_string()],
@@ -117,6 +127,27 @@ fn not_found_anywhere_is_no_data_exit_1() {
     let err = run(&http, &req("ghost", None)).unwrap_err();
     assert!(matches!(err, DownstatError::NoData { .. }));
     assert_eq!(err.exit_code(), 1);
+}
+
+#[test]
+fn unavailable_selected_registry_is_not_reported_as_no_data() {
+    let err = run(
+        &UnavailableHttp,
+        &req("serde", Some(vec![Registry::Crates])),
+    )
+    .unwrap_err();
+    assert!(matches!(err, DownstatError::Http { .. }));
+    assert_eq!(err.kind(), "unavailable");
+    assert_eq!(err.exit_code(), 2);
+}
+
+#[test]
+fn malformed_selected_registry_response_preserves_parse_error() {
+    let http = FakeHttp::new(&[("https://crates.io/api/v1/crates/broken", "not json")]);
+    let err = run(&http, &req("broken", Some(vec![Registry::Crates]))).unwrap_err();
+    assert!(matches!(err, DownstatError::Parse { .. }));
+    assert_eq!(err.kind(), "parse");
+    assert_eq!(err.exit_code(), 2);
 }
 
 #[test]

@@ -46,6 +46,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// List the supported registries without making network requests.
+    Registries,
     /// Print the machine-readable contract (clispec.dev) as JSON.
     Schema,
     /// Generate a shell completion script.
@@ -110,6 +112,14 @@ fn main() -> ExitCode {
     };
 
     match &cli.command {
+        Some(Command::Registries) => {
+            let registries = ["crates", "pypi", "npm", "github"];
+            match cli.output.resolve() {
+                OutputFormat::Json => println!("{}", json!({"registries": registries})),
+                OutputFormat::Table => println!("{}", registries.join("\n")),
+            }
+            return ExitCode::SUCCESS;
+        }
         Some(Command::Schema) => {
             println!("{}", schema::contract_json());
             return ExitCode::SUCCESS;

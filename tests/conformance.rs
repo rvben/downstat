@@ -1,10 +1,10 @@
-//! `downstat schema` must validate against the published clispec v0.2 JSON
-//! Schema (vendored at schemas/clispec-v0.2.json).
+//! `downstat schema` must validate against the clispec v0.3 candidate JSON
+//! Schema (vendored at schemas/clispec-v0.3.json).
 
 #[test]
-fn schema_conforms_to_clispec_v0_2() {
+fn schema_conforms_to_clispec_v0_3() {
     let schema: serde_json::Value =
-        serde_json::from_str(include_str!("../schemas/clispec-v0.2.json"))
+        serde_json::from_str(include_str!("../schemas/clispec-v0.3.json"))
             .expect("vendored clispec schema is valid JSON");
 
     let instance = downstat::schema::contract();
@@ -16,7 +16,7 @@ fn schema_conforms_to_clispec_v0_2() {
             .map(|e| format!("{} at {}", e, e.instance_path()))
             .collect();
         panic!(
-            "downstat schema does not conform to clispec v0.2:\n{}",
+            "downstat schema does not conform to clispec v0.3:\n{}",
             errors.join("\n")
         );
     }
@@ -25,11 +25,11 @@ fn schema_conforms_to_clispec_v0_2() {
 #[test]
 fn schema_declares_expected_shape() {
     let v = downstat::schema::contract();
-    assert_eq!(v["clispec"], "0.2");
+    assert_eq!(v["clispec"], "0.3");
     assert_eq!(v["name"], "downstat");
     // downstat is entirely read-only.
     for c in v["commands"].as_array().unwrap() {
-        assert_eq!(c["mutating"], false, "{} must be read-only", c["name"]);
+        assert_eq!(c["effects"], "read_only", "{} must be read-only", c["name"]);
     }
     assert!(v["global_args"].as_array().is_some_and(|g| !g.is_empty()));
     assert!(v["errors"].as_array().is_some_and(|e| !e.is_empty()));

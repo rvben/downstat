@@ -1,6 +1,6 @@
 [package]
 name = "downstat"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.90"
 description = "Downloads and latest version for your published packages across crates.io, PyPI, npm and GitHub releases, in one view. Agent-friendly: JSON when piped."

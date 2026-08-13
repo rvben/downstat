@@ -38,7 +38,7 @@ impl DownstatError {
     pub fn kind(&self) -> &'static str {
         match self {
             DownstatError::Usage { .. } => "usage",
-            DownstatError::Http { .. } => "http",
+            DownstatError::Http { .. } => "unavailable",
             DownstatError::Parse { .. } => "parse",
             DownstatError::NoData { .. } => "no_data",
         }

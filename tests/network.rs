@@ -46,7 +46,16 @@ fn real_pypi_downloads_parse() {
     let Some(r) = single_registry(&["requests", "--only", "pypi", "-o", "json"], "pypi") else {
         return;
     };
-    assert!(r["downloads"]["recent"].as_u64().unwrap() > 1_000_000);
+    let Some(recent) = r["downloads"]["recent"].as_u64() else {
+        assert_eq!(
+            r["note"].as_str(),
+            Some("downloads via pypistats unavailable"),
+            "missing PyPI count without an upstream-unavailable note: {r}"
+        );
+        eprintln!("skipping (pypistats unavailable)");
+        return;
+    };
+    assert!(recent > 1_000_000);
 }
 
 #[test]

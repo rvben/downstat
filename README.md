@@ -77,8 +77,10 @@ taps expose no public download counts, so they are omitted rather than faked.
 
 downstat follows [The CLI Spec](https://clispec.dev): structured output on
 stdout, structured error envelopes on the last line of stderr, and a `schema`
-subcommand whose output validates against `clispec.dev/schema/v0.2.json`
-(checked by the test suite). Every command is read-only (`mutating: false`).
+subcommand whose development-branch output validates against the candidate
+`clispec.dev/schema/v0.3.json` (checked by the test suite). Every command
+declares `effects: read_only`; the published release remains on frozen v0.2
+until v0.3 freezes.
 
 ## License
 
