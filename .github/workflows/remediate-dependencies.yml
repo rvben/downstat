@@ -19,7 +19,7 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       vars.UPD_SECURITY_REMEDIATION_ENABLED == 'true'
-    uses: rvben/upd/.github/workflows/dependency-remediation.yml@94b504618ad6cd5eb9cf3558bfa0f6593666ea41
+    uses: rvben/upd/.github/workflows/dependency-remediation.yml@04b96d425833bb3ab3bd134b78256e7e8ac3a67c
     with:
       publish: >-
         ${{ (github.event_name == 'schedule' &&
