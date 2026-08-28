@@ -27,7 +27,7 @@ jobs:
             (github.event_name == 'workflow_dispatch' && inputs.publish) }}
       langs: rust
       allowed-paths: Cargo.toml Cargo.lock
-      validation-command: make check
+      validation-command: cargo fmt -- --check && cargo clippy --all-targets -- -D warnings && cargo test
       branch: security/upd
       commit-message: "fix(deps): remediate vulnerable Rust dependencies with upd"
       pull-request-title: "fix(deps): remediate vulnerable Rust dependencies with upd"
