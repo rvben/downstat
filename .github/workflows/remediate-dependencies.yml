@@ -20,7 +20,7 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       vars.UPD_SECURITY_REMEDIATION_ENABLED == 'true'
-    uses: rvben/upd/.github/workflows/dependency-remediation.yml@355b6dc049f271e8ca9157f1d6595470d4c49066
+    uses: rvben/upd/.github/workflows/dependency-remediation.yml@1d9075c8c5c2b15242cecc85367edbdebc7d7178
     with:
       publish: >-
         ${{ (github.event_name == 'schedule' &&
@@ -32,4 +32,3 @@ jobs:
       branch: security/upd
       commit-message: "fix(deps): remediate vulnerable Rust dependencies with upd"
       pull-request-title: "fix(deps): remediate vulnerable Rust dependencies with upd"
-      broker-url: ${{ vars.UPD_BROKER_URL }}
