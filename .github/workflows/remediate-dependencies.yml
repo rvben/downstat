@@ -17,14 +17,10 @@ permissions:
 
 jobs:
   remediate:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      vars.UPD_SECURITY_REMEDIATION_ENABLED == 'true'
-    uses: rvben/upd/.github/workflows/dependency-remediation.yml@1d9075c8c5c2b15242cecc85367edbdebc7d7178
+    uses: rvben/upd/.github/workflows/dependency-remediation.yml@1a8c9cd6e0e5f21251f89b2bd9f9fcbff776030d
     with:
       publish: >-
-        ${{ (github.event_name == 'schedule' &&
-             vars.UPD_SECURITY_REMEDIATION_ENABLED == 'true') ||
+        ${{ github.event_name == 'schedule' ||
             (github.event_name == 'workflow_dispatch' && inputs.publish) }}
       langs: rust
       allowed-paths: Cargo.toml Cargo.lock
