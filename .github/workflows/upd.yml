@@ -6,14 +6,22 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
+  id-token: write
+  pull-requests: read
 
 jobs:
   update:
-    uses: rvben/upd/.github/workflows/dependency-health.yml@bdc55ece90b7333f177027ad208705b815b6caab # v0.5.2
+    uses: rvben/upd/.github/workflows/dependency-health.yml@355b6dc049f271e8ca9157f1d6595470d4c49066
     with:
-      upd-version: v0.5.2
+      langs: rust,actions
+      lock: true
       min-age: 7d
       max-bump: minor
+      update-action-shas: true
+      prepare-command: rustup toolchain install 1.96.0 --profile minimal --component clippy,rustfmt && rustup default 1.96.0
+      validation-command: cargo fmt -- --check && cargo clippy --all-targets -- -D warnings && cargo test
       fail-on-blocked: false
+      branch: deps/upd
+      commit-message: "chore(deps): weekly dependency update"
+      broker-url: ${{ vars.UPD_BROKER_URL }}
