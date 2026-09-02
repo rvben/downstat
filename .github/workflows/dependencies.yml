@@ -1,4 +1,4 @@
-name: upd dependency health
+name: Dependency health
 
 on:
   schedule:
@@ -8,18 +8,20 @@ on:
 permissions:
   contents: read
   id-token: write
+  packages: read
   pull-requests: read
 
 jobs:
   update:
-    uses: rvben/upd/.github/workflows/dependency-health.yml@1a8c9cd6e0e5f21251f89b2bd9f9fcbff776030d
+    uses: rvben/upd/.github/workflows/dependency-health.yml@ecb605d32c4edc8dee4091aeb30b3d37ebdd290a # v0.10.0
     with:
       langs: rust,actions
       lock: true
       min-age: 7d
       max-bump: minor
-      update-action-shas: true
-      prepare-command: rustup toolchain install 1.96.0 --profile minimal --component clippy,rustfmt && rustup default 1.96.0
+      prepare-command: >-
+        rustup toolchain install 1.96.0 --profile minimal --component clippy,rustfmt &&
+        rustup default 1.96.0
       validation-command: cargo fmt -- --check && cargo clippy --all-targets -- -D warnings && cargo test
       fail-on-blocked: false
       branch: deps/upd
