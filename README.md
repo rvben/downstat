@@ -17,6 +17,14 @@ your whole portfolio. JSON when piped, a table in a terminal.
 
 ## Install
 
+### Homebrew
+
+```sh
+brew install rvben/tap/downstat
+```
+
+### Other installation methods
+
 ```sh
 cargo install downstat
 ```
