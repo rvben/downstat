@@ -116,48 +116,71 @@ const GITHUB_RELEASES_PER_PAGE: usize = 100;
 const GITHUB_RELEASES_MAX: usize = 10_000;
 
 /// GitHub releases: the latest tag, and the all-time download total summed over
-/// the assets of every published release.
+/// the assets of every published release. A repo whose only published releases
+/// are prereleases has no latest release but is still found, without a version.
 pub fn github_releases(
     http: &dyn Http,
     owner: &str,
     repo: &str,
 ) -> Result<RegistryStat, DownstatError> {
     let url = format!("https://api.github.com/repos/{owner}/{repo}/releases/latest");
-    let Some(body) = http.get(&url)? else {
+    let latest = match http.get(&url)? {
+        Some(body) => Some(parse("github", &body)?),
+        None => None,
+    };
+    let Some(releases) = github_release_downloads(http, owner, repo, latest.is_some())? else {
         return Ok(RegistryStat::absent(Registry::Github));
     };
-    let latest = parse("github", &body)?;
-    let total = github_release_downloads(http, owner, repo)?;
+    if latest.is_none() && releases.published == 0 {
+        return Ok(RegistryStat::absent(Registry::Github));
+    }
+    let version = latest
+        .as_ref()
+        .and_then(|l| l["tag_name"].as_str())
+        .map(str::to_string);
+    let note = latest
+        .is_none()
+        .then(|| "only prereleases are published".to_string());
     Ok(RegistryStat {
         registry: Registry::Github,
         found: true,
-        version: latest["tag_name"].as_str().map(str::to_string),
+        version,
         downloads: Some(Downloads {
-            total: Some(total),
+            total: Some(releases.total),
             recent: None,
             window: "releases",
         }),
         url: Some(format!("https://github.com/{owner}/{repo}/releases")),
-        note: None,
+        note,
     })
+}
+
+/// The published (non-draft) releases of a repo: how many, and their summed
+/// asset downloads.
+struct ReleaseDownloads {
+    published: usize,
+    total: u64,
 }
 
 /// Sum `download_count` over every asset of every published release, following
 /// pages until one comes back short. Drafts (listed only to callers with push
 /// access) are skipped, and a release seen on two pages (the list shifted while
-/// it was read) is counted once. A malformed page, an overflowing sum or a
-/// history past [`GITHUB_RELEASES_MAX`] is a parse error, never a partial or
-/// wrong total.
+/// it was read) is counted once. A 404 on the first page means the repo is
+/// absent (`None`) unless `latest_found` says it exists. A malformed page, a 404
+/// on a later page, an overflowing sum or a history past [`GITHUB_RELEASES_MAX`]
+/// is a parse error, never a partial or wrong total.
 fn github_release_downloads(
     http: &dyn Http,
     owner: &str,
     repo: &str,
-) -> Result<u64, DownstatError> {
+    latest_found: bool,
+) -> Result<Option<ReleaseDownloads>, DownstatError> {
     let malformed = |message: String| DownstatError::Parse {
         registry: "github",
         message,
     };
     let mut total = 0u64;
+    let mut published = 0usize;
     let mut seen = HashSet::new();
     // The page after the cap must come back empty for the history to fit.
     let past_cap = GITHUB_RELEASES_MAX / GITHUB_RELEASES_PER_PAGE + 1;
@@ -165,11 +188,14 @@ fn github_release_downloads(
         let url = format!(
             "https://api.github.com/repos/{owner}/{repo}/releases?per_page={GITHUB_RELEASES_PER_PAGE}&page={page}"
         );
-        let body = http.get(&url)?.ok_or_else(|| {
-            malformed(format!(
-                "{url} returned 404 after the latest release was found"
-            ))
-        })?;
+        let Some(body) = http.get(&url)? else {
+            if page == 1 && !latest_found {
+                return Ok(None);
+            }
+            return Err(malformed(format!(
+                "{url} returned 404 after the repo's releases were found"
+            )));
+        };
         let releases = parse("github", &body)?;
         let releases = releases
             .as_array()
@@ -193,6 +219,7 @@ fn github_release_downloads(
             if draft || !seen.insert(id) {
                 continue;
             }
+            published += 1;
             let assets = release["assets"]
                 .as_array()
                 .ok_or_else(|| malformed(format!("release {id} in {url} has no assets list")))?;
@@ -206,7 +233,7 @@ fn github_release_downloads(
             }
         }
         if releases.len() < GITHUB_RELEASES_PER_PAGE {
-            return Ok(total);
+            return Ok(Some(ReleaseDownloads { published, total }));
         }
     }
     Err(malformed(format!(

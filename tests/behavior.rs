@@ -244,6 +244,45 @@ fn github_total_includes_prereleases() {
     assert_eq!(github_total(&http, "pre"), 34);
 }
 
+/// `paged` for a repo with no latest release (GitHub's `/releases/latest`
+/// skips prereleases and drafts, so it 404s).
+fn paged_without_latest(name: &str, pages: Vec<String>) -> FakeHttp {
+    let mut http = paged(name, pages);
+    http.0.remove(&format!(
+        "https://api.github.com/repos/rvben/{name}/releases/latest"
+    ));
+    http
+}
+
+#[test]
+fn github_prerelease_only_repo_is_found_with_its_total() {
+    let pre =
+        r#"{"id":1,"draft":false,"prerelease":true,"assets":[{"download_count":30}]}"#.to_string();
+    let http = paged_without_latest("rc", vec![page(&[pre])]);
+    let v = json(&run(&http, &req("rc", github_only())).unwrap());
+    let r = reg(&v, "github");
+    assert_eq!(r["found"], true);
+    assert_eq!(r["downloads"]["total"], 30);
+    assert_eq!(r["version"], serde_json::Value::Null);
+    assert_eq!(r["note"], "only prereleases are published");
+}
+
+#[test]
+fn github_repo_without_published_releases_is_absent() {
+    let draft = r#"{"id":1,"draft":true,"assets":[{"download_count":9}]}"#.to_string();
+    for (label, pages) in [
+        ("empty", vec!["[]".to_string()]),
+        ("drafts", vec![page(&[draft])]),
+    ] {
+        let http = paged_without_latest(label, pages);
+        let err = github_error(&http, label);
+        assert!(
+            matches!(err, DownstatError::NoData { .. }),
+            "{label}: {err:?}"
+        );
+    }
+}
+
 #[test]
 fn github_page_larger_than_requested_is_an_error() {
     // 101 releases on one page would slip past a cap that only counts pages.
