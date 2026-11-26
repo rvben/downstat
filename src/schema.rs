@@ -94,7 +94,7 @@ pub fn contract() -> Value {
             {"kind": "parse", "exit_code": 2, "retryable": false, "description": "A registry returned an unparseable response."}
         ],
         "extensions": {
-            "notes": "Download counts are normalized but not directly comparable across registries (different windows): crates.io reports total + 90-day, npm/PyPI report a 30-day window, GitHub reports summed release-asset totals. PyPI counts come from pypistats.org. ghcr and Homebrew taps expose no public download counts and are omitted."
+            "notes": "Download counts are normalized but not directly comparable across registries (different windows): crates.io reports total + 90-day, npm/PyPI report a 30-day window, GitHub reports all-time asset downloads summed over every release. PyPI counts come from pypistats.org. ghcr and Homebrew taps expose no public download counts and are omitted."
         }
     })
 }

@@ -62,7 +62,7 @@ packages = ["dotpick", "whatport", "onym", "vership"]
 | crates.io | total + 90-day | ✓ |
 | PyPI | 30-day (via pypistats.org) | ✓ |
 | npm | 30-day | ✓ |
-| GitHub releases | summed release-asset downloads | ✓ (latest tag) |
+| GitHub releases | all-time asset downloads, summed over every release | ✓ (latest tag) |
 
 The GitHub repo is discovered from crates.io's `repository` field. A
 `GITHUB_TOKEN`/`GH_TOKEN` env var (optional) lifts GitHub's unauthenticated

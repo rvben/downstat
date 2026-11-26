@@ -75,6 +75,12 @@ fn full_fixture(name: &str) -> FakeHttp {
             "https://api.github.com/repos/rvben/onym/releases/latest",
             r#"{"tag_name":"v0.1.2","assets":[{"download_count":7},{"download_count":3}]}"#,
         ),
+        (
+            "https://api.github.com/repos/rvben/onym/releases?per_page=100&page=1",
+            r#"[{"id":3,"draft":false,"tag_name":"v0.1.2","assets":[{"download_count":7},{"download_count":3}]},
+                {"id":2,"draft":false,"tag_name":"v0.1.1","assets":[{"download_count":90}]},
+                {"id":1,"draft":false,"tag_name":"v0.1.0","assets":[]}]"#,
+        ),
     ])
 }
 
@@ -101,10 +107,211 @@ fn aggregates_downloads_and_versions_across_registries() {
     assert_eq!(reg(&v, "npm")["version"], "9.9.9");
     assert_eq!(reg(&v, "npm")["downloads"]["recent"], 10);
 
-    // GitHub repo derived from crates.io metadata; asset counts summed.
+    // GitHub repo derived from crates.io metadata; asset counts summed over
+    // every release, not only the latest.
     let g = reg(&v, "github");
     assert_eq!(g["version"], "v0.1.2");
-    assert_eq!(g["downloads"]["total"], 10);
+    assert_eq!(g["downloads"]["total"], 100);
+}
+
+/// crates.io metadata pointing at `rvben/<name>` on GitHub, a latest release,
+/// and the given release-list pages; every other registry 404s.
+fn paged(name: &str, pages: Vec<String>) -> FakeHttp {
+    let mut pairs = vec![
+        (
+            format!("https://crates.io/api/v1/crates/{name}"),
+            format!(
+                r#"{{"crate":{{"max_version":"1.0.0","downloads":1,"recent_downloads":1,"repository":"https://github.com/rvben/{name}"}}}}"#
+            ),
+        ),
+        (
+            format!("https://api.github.com/repos/rvben/{name}/releases/latest"),
+            r#"{"tag_name":"v-latest","assets":[]}"#.to_string(),
+        ),
+    ];
+    pairs.extend(pages.into_iter().enumerate().map(|(i, body)| {
+        (
+            format!(
+                "https://api.github.com/repos/rvben/{name}/releases?per_page=100&page={}",
+                i + 1
+            ),
+            body,
+        )
+    }));
+    FakeHttp(pairs.into_iter().collect())
+}
+
+/// One published release with the given asset download counts.
+fn release(id: u64, counts: &[u64]) -> String {
+    let assets: Vec<String> = counts
+        .iter()
+        .map(|c| format!(r#"{{"download_count":{c}}}"#))
+        .collect();
+    format!(
+        r#"{{"id":{id},"draft":false,"assets":[{}]}}"#,
+        assets.join(",")
+    )
+}
+
+fn page(releases: &[String]) -> String {
+    format!("[{}]", releases.join(","))
+}
+
+/// `n` releases with ids from `first_id`, one asset of `count` downloads each.
+fn run_of(first_id: u64, n: u64, count: u64) -> Vec<String> {
+    (first_id..first_id + n)
+        .map(|id| release(id, &[count]))
+        .collect()
+}
+
+fn github_only() -> Option<Vec<Registry>> {
+    Some(vec![Registry::Github])
+}
+
+fn github_total(http: &FakeHttp, name: &str) -> serde_json::Value {
+    let v = json(&run(http, &req(name, github_only())).unwrap());
+    reg(&v, "github")["downloads"]["total"].clone()
+}
+
+fn github_error(http: &FakeHttp, name: &str) -> DownstatError {
+    run(http, &req(name, github_only())).unwrap_err()
+}
+
+#[test]
+fn github_total_counts_every_release_not_only_the_latest() {
+    // A release published hours ago has almost no downloads of its own; the
+    // all-time total must still include the releases before it.
+    let http = paged(
+        "rg",
+        vec![page(&[release(2, &[5]), release(1, &[2_000_000, 1])])],
+    );
+    assert_eq!(github_total(&http, "rg"), 2_000_006);
+}
+
+#[test]
+fn github_total_follows_pages_until_a_short_page() {
+    let http = paged(
+        "many",
+        vec![page(&run_of(1, 100, 1)), page(&[release(101, &[40])])],
+    );
+    assert_eq!(github_total(&http, "many"), 140);
+}
+
+#[test]
+fn github_total_accepts_an_empty_page_after_a_full_one() {
+    let http = paged("exact", vec![page(&run_of(1, 100, 2)), "[]".into()]);
+    assert_eq!(github_total(&http, "exact"), 200);
+}
+
+#[test]
+fn github_total_reads_a_history_of_exactly_the_release_cap() {
+    let mut pages: Vec<String> = (0..100)
+        .map(|p| page(&run_of(p * 100 + 1, 100, 1)))
+        .collect();
+    pages.push("[]".into());
+    assert_eq!(github_total(&paged("cap", pages), "cap"), 10_000);
+}
+
+#[test]
+fn github_history_past_the_release_cap_is_an_error_not_a_partial_total() {
+    // 10,001 releases: the page after the cap holds one release.
+    let mut pages: Vec<String> = (0..100)
+        .map(|p| page(&run_of(p * 100 + 1, 100, 1)))
+        .collect();
+    pages.push(page(&[release(10_001, &[1])]));
+    let err = github_error(&paged("huge", pages), "huge");
+    assert!(matches!(err, DownstatError::Parse { .. }), "{err:?}");
+}
+
+#[test]
+fn github_release_repeated_across_pages_is_counted_once() {
+    // A release published between page requests shifts release 100 onto page 2.
+    let http = paged(
+        "shift",
+        vec![
+            page(&run_of(1, 100, 1)),
+            page(&[release(100, &[1]), release(101, &[7])]),
+        ],
+    );
+    assert_eq!(github_total(&http, "shift"), 107);
+}
+
+#[test]
+fn github_total_includes_prereleases() {
+    let pre =
+        r#"{"id":2,"draft":false,"prerelease":true,"assets":[{"download_count":30}]}"#.to_string();
+    let http = paged("pre", vec![page(&[pre, release(1, &[4])])]);
+    assert_eq!(github_total(&http, "pre"), 34);
+}
+
+#[test]
+fn github_page_larger_than_requested_is_an_error() {
+    // 101 releases on one page would slip past a cap that only counts pages.
+    let http = paged("oversized", vec![page(&run_of(1, 101, 1)), "[]".into()]);
+    let err = github_error(&http, "oversized");
+    assert!(matches!(err, DownstatError::Parse { .. }), "{err:?}");
+}
+
+#[test]
+fn github_later_page_404_is_an_error_not_a_partial_total() {
+    // Page 1 is full, page 2 is absent from the fake (a 404).
+    let http = paged("gone", vec![page(&run_of(1, 100, 1))]);
+    let err = github_error(&http, "gone");
+    assert!(matches!(err, DownstatError::Parse { .. }), "{err:?}");
+}
+
+#[test]
+fn github_total_skips_draft_releases() {
+    let draft = r#"{"id":9,"draft":true,"assets":[{"download_count":1000}]}"#.to_string();
+    let http = paged("drafts", vec![page(&[draft, release(1, &[4])])]);
+    assert_eq!(github_total(&http, "drafts"), 4);
+}
+
+#[test]
+fn overflowing_github_total_is_an_error_not_a_capped_value() {
+    let http = paged("big", vec![page(&[release(1, &[u64::MAX, 1])])]);
+    let err = github_error(&http, "big");
+    assert!(matches!(err, DownstatError::Parse { .. }), "{err:?}");
+}
+
+#[test]
+fn malformed_github_release_list_is_a_parse_error_not_a_partial_total() {
+    for (label, pages) in [
+        (
+            "not a list",
+            vec![r#"{"message":"rate limited"}"#.to_string()],
+        ),
+        (
+            "release without an id",
+            vec![r#"[{"draft":false,"assets":[]}]"#.into()],
+        ),
+        (
+            "release without a draft flag",
+            vec![r#"[{"id":1,"assets":[]}]"#.into()],
+        ),
+        (
+            "non-boolean draft flag",
+            vec![r#"[{"id":1,"draft":"true","assets":[]}]"#.into()],
+        ),
+        (
+            "release without assets",
+            vec![r#"[{"id":1,"draft":false}]"#.into()],
+        ),
+        (
+            "asset without a count",
+            vec![r#"[{"id":1,"draft":false,"assets":[{"name":"x"}]}]"#.into()],
+        ),
+        (
+            "malformed later page",
+            vec![page(&run_of(1, 100, 5)), r#"{"message":"oops"}"#.into()],
+        ),
+    ] {
+        let err = github_error(&paged("bad", pages), "bad");
+        assert!(
+            matches!(err, DownstatError::Parse { .. }),
+            "{label}: expected a parse error, got {err:?}"
+        );
+    }
 }
 
 #[test]
