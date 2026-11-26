@@ -26,10 +26,18 @@ fn run(args: &[&str]) -> Out {
     }
 }
 
-/// Returns the single registry stat, or None to skip (network down).
+/// The `kind` from the error envelope on the last line of stderr.
+fn error_kind(stderr: &str) -> Option<String> {
+    let envelope: serde_json::Value = serde_json::from_str(stderr.trim().lines().last()?).ok()?;
+    envelope["error"]["kind"].as_str().map(str::to_string)
+}
+
+/// Returns the single registry stat, or None to skip (network down). Only an
+/// `unavailable` error skips: a `parse` error is the API-shape drift these
+/// tests exist to catch, so it fails.
 fn single_registry(args: &[&str], registry: &str) -> Option<serde_json::Value> {
     let out = run(args);
-    if out.code == 2 {
+    if out.code == 2 && error_kind(&out.stderr).as_deref() == Some("unavailable") {
         eprintln!("skipping (network unavailable): {}", out.stderr.trim());
         return None;
     }
