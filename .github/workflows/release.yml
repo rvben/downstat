@@ -252,7 +252,7 @@ jobs:
 
           cat > /tmp/downstat.rb << 'FORMULA'
           class Downstat < Formula
-            desc "Downloads and latest version for your packages across crates.io, PyPI, npm and GitHub releases"
+            desc "Package downloads and latest versions on crates.io, PyPI, npm and GitHub"
             homepage "https://github.com/rvben/downstat"
             version "VERSION_NUM"
             license "MIT"
